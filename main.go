@@ -1,4 +1,5 @@
 package main
+
 import (
 	"encoding/binary" // For binary.BigEndian
 	"fmt"
@@ -37,20 +38,20 @@ const (
 	powerLSB   = 10.0 // mW/LSB for Power Register
 )
 
-// Define Prometheus gauges
+// Define Prometheus gauges with labels
 var (
-	ina260Current = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "ina260_current_amperes",
+	ina260Current = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ina260_current",
 		Help: "Current measured by INA260 sensor in Amperes.",
-	})
-	ina260Voltage = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "ina260_voltage_volts",
+	}, []string{"hostname", "device"}) // Added labels: hostname, device
+	ina260Voltage = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ina260_voltage",
 		Help: "Bus voltage measured by INA260 sensor in Volts.",
-	})
-	ina260Power = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "ina260_power_watts",
+	}, []string{"hostname", "device"}) // Added labels: hostname, device
+	ina260Power = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ina260_power",
 		Help: "Power measured by INA260 sensor in Watts.",
-	})
+	}, []string{"hostname", "device"}) // Added labels: hostname, device
 )
 
 // readINA260Reg reads a 16-bit value from the specified INA260 register.
@@ -78,6 +79,12 @@ func main() {
 		log.Fatal(err)
 	}
 	defer bus.Close()
+
+	// -------------------- Set Hostname Label --------------------
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Fatalf("Failed to get hostname: %v", err)
+	}
 
 	// --- Get TCA's address as argument and assign it to tcaAddress ---
 	// Get the TCA address and channel number as arguments
@@ -123,6 +130,9 @@ func main() {
 	// Now, communications on 'bus' will be routed to devices on the selected channel.
 	// Proceed to communicate with the INA260.
 	ina260 := &i2c.Dev{Bus: bus, Addr: ina260Address}
+
+	// -------------------- Set Device Label --------------------
+	deviceLabel := fmt.Sprintf("tca9548a_0x%X_ch%d_ina260", tcaAddress, ina260Channel)
 
 	// Optional: Read Manufacturer ID and Device ID to verify communication with INA260
 	// Expected Manufacturer ID: 0x5449 (TI), Device ID: 0x2260 (INA260)
@@ -188,10 +198,10 @@ func main() {
 
 		fmt.Printf("Voltage: %.3f V, Current: %.3f A, Power: %.3f W\n", voltage, current, power)
 
-		// Update Prometheus gauges
-		ina260Current.Set(current)
-		ina260Voltage.Set(voltage)
-		ina260Power.Set(power)
+		// Update Prometheus gauges with label values
+		ina260Current.WithLabelValues(hostname, deviceLabel).Set(current)
+		ina260Voltage.WithLabelValues(hostname, deviceLabel).Set(voltage)
+		ina260Power.WithLabelValues(hostname, deviceLabel).Set(power)
 
 		time.Sleep(1 * time.Second) // Wait for 1 second before the next reading
 	}
