@@ -1,9 +1,26 @@
-package main
+/*
 
+ To provide metrics for Prometheus, we'll use the `github.com/prometheus/client_golang/prometheus` and `github.com/prometheus/client_golang/prometheus/promhttp` libraries. These libraries allow us to define metrics (like gauges for current, voltage, and power) and expose them via an HTTP endpoint that Prometheus can scrape.
+
+Here's how to integrate Prometheus metrics into your existing Go application:
+
+1.  **Import necessary packages:**
+    *   `net/http` for the HTTP server.
+    *   `github.com/prometheus/client_golang/prometheus` for defining metrics.
+    *   `github.com/prometheus/client_golang/prometheus/promhttp` for the HTTP handler that exposes metrics.
+
+2.  **Define global Prometheus Gauges:** Gauges are suitable for values that can go up and down, such as current, voltage, and power. We'll create three `Gauge` metrics: `ina260_current_amperes`, `ina260_voltage_volts`, and `ina260_power_watts`. We'll use `promauto.NewGauge` which automatically registers the metric with the default Prometheus registry.
+
+3.  **Update metrics in the reading loop:** Inside the infinite loop where the `INA260` sensor data is read, after successfully reading the current, voltage, and power, we'll update the corresponding Prometheus gauges using the `Set()` method.
+
+4.  **Start an HTTP server:** In a separate goroutine, an HTTP server will be started to listen for requests on a specific port (e.g., 9090). The `/metrics` endpoint will be handled by `promhttp.Handler()`, which exposes all registered Prometheus metrics.
+*/
+package main
 import (
 	"encoding/binary" // For binary.BigEndian
 	"fmt"
 	"log"
+	"net/http" // New import for HTTP server
 	"os"
 	"strconv"
 	"time" // For time.Sleep
@@ -11,6 +28,10 @@ import (
 	"periph.io/x/conn/v3/i2c"
 	"periph.io/x/conn/v3/i2c/i2creg"
 	"periph.io/x/host/v3"
+
+	"github.com/prometheus/client_golang/prometheus"          // New import for Prometheus metrics
+	"github.com/prometheus/client_golang/prometheus/promauto" // New import for auto-registering metrics
+	"github.com/prometheus/client_golang/prometheus/promhttp" // New import for HTTP handler
 )
 
 // INA260 I2C address
@@ -31,6 +52,22 @@ const (
 	voltageLSB = 1.25 // mV/LSB for Bus Voltage Register
 	currentLSB = 1.25 // mA/LSB for Current Register
 	powerLSB   = 10.0 // mW/LSB for Power Register
+)
+
+// Define Prometheus gauges
+var (
+	ina260Current = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "ina260_current_amperes",
+		Help: "Current measured by INA260 sensor in Amperes.",
+	})
+	ina260Voltage = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "ina260_voltage_volts",
+		Help: "Bus voltage measured by INA260 sensor in Volts.",
+	})
+	ina260Power = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "ina260_power_watts",
+		Help: "Power measured by INA260 sensor in Watts.",
+	})
 )
 
 // readINA260Reg reads a 16-bit value from the specified INA260 register.
@@ -58,8 +95,6 @@ func main() {
 		log.Fatal(err)
 	}
 	defer bus.Close()
-
-	// tcaAddress := uint16(0x70) // Default TCA9548A address
 
 	// --- Get TCA's address as argument and assign it to tcaAddress ---
 	// Get the TCA address and channel number as arguments
@@ -121,6 +156,16 @@ func main() {
 		fmt.Printf("Warning: Unexpected INA260 Manufacturer ID or Device ID. Expected 0x5449/0x2260, got 0x%X/0x%X\n", manufID, deviceID)
 	}
 
+	// Start HTTP server for Prometheus metrics in a goroutine
+	go func() {
+		http.Handle("/metrics", promhttp.Handler()) // Handles the /metrics endpoint
+		port := ":9090"
+		log.Printf("Starting Prometheus metrics server on port %s", port)
+		if err := http.ListenAndServe(port, nil); err != nil {
+			log.Fatalf("Error starting HTTP server: %v", err)
+		}
+	}()
+
 	// Continuously read and display values from INA260
 	fmt.Println("Reading INA260 values (Voltage, Current, Power)...")
 	for {
@@ -135,7 +180,7 @@ func main() {
 		// The Current Register (0x01) is a 16-bit two's complement signed integer.
 		// `binary.BigEndian.Uint16` reads it as unsigned, so cast to `int16` to preserve sign.
 		// Convert raw current (mA) to Amperes (A)
-		current := float64(rawCurrent) * currentLSB / 1000.0
+		current := float64(int16(rawCurrent)) * currentLSB / 1000.0
 
 		// Read Voltage (Register 0x02)
 		rawVoltage, err := readINA260Reg(ina260, ina260RegBusVoltage)
@@ -159,6 +204,11 @@ func main() {
 		power := float64(rawPower) * powerLSB / 1000.0
 
 		fmt.Printf("Voltage: %.3f V, Current: %.3f A, Power: %.3f W\n", voltage, current, power)
+
+		// Update Prometheus gauges
+		ina260Current.Set(current)
+		ina260Voltage.Set(voltage)
+		ina260Power.Set(power)
 
 		time.Sleep(1 * time.Second) // Wait for 1 second before the next reading
 	}
