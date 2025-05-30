@@ -20,7 +20,7 @@ const ina260Address = uint16(0x40) // Default INA260 I2C address
 const (
 	ina260RegConfig     byte = 0x00 // Configuration Register
 	ina260RegCurrent    byte = 0x01 // Current Register
-	ina260RegBusVoltage    byte = 0x02 // Bus Voltage Register
+	ina260RegBusVoltage byte = 0x02 // Bus Voltage Register
 	ina260RegPower      byte = 0x03 // Power Register
 	ina260RegManufID    byte = 0xFE // Manufacturer ID Register
 	ina260RegDeviceID   byte = 0xFF // Device ID Register
@@ -28,9 +28,9 @@ const (
 
 // INA260 Scaling Factors
 const (
-	voltageLSB = 1.25  // mV/LSB for Bus Voltage Register
-	currentLSB = 1.25  // mA/LSB for Current Register
-	powerLSB   = 10.0  // mW/LSB for Power Register
+	voltageLSB = 1.25 // mV/LSB for Bus Voltage Register
+	currentLSB = 1.25 // mA/LSB for Current Register
+	powerLSB   = 10.0 // mW/LSB for Power Register
 )
 
 // readINA260Reg reads a 16-bit value from the specified INA260 register.
@@ -59,16 +59,27 @@ func main() {
 	}
 	defer bus.Close()
 
-	tcaAddress := uint16(0x70) // Default TCA9548A address
+	// tcaAddress := uint16(0x70) // Default TCA9548A address
+
+	// --- Get TCA's address as argument and assign it to tcaAddress ---
+	// Get the TCA address and channel number as arguments
+	if len(os.Args) < 3 {
+		log.Fatalf("Usage: %s <tca_address_hex> <channel_number>", os.Args[0])
+	}
+
+	tcaAddressStr := os.Args[1]
+	tcaAddress64, err := strconv.ParseUint(tcaAddressStr, 0, 16) // 0 for auto-detection of base (0x prefix means hex)
+	if err != nil {
+		log.Fatalf("Invalid TCA address: %v", err)
+	}
+	tcaAddress := uint16(tcaAddress64)
+
 	tca := &i2c.Dev{Bus: bus, Addr: tcaAddress}
+	fmt.Printf("Using TCA9548A at address: 0x%X\n", tcaAddress) // Confirm the address being used
 
 	// --- Select the channel the INA260 is on ---
 	// Get the channel number as argument and assign it to ina260Channel variable
-	if len(os.Args) < 2 {
-		log.Fatalf("Usage: %s <channel_number>", os.Args[0])
-	}
-
-	channelStr := os.Args[1]
+	channelStr := os.Args[2] // Now channel number is the second argument
 	channelInt, err := strconv.Atoi(channelStr)
 	if err != nil {
 		log.Fatalf("Invalid channel number: %v", err)
@@ -129,7 +140,7 @@ func main() {
 		}
 
 		// Convert raw voltage (mV) to Volts (V)
-		voltage := float64(int16(rawVoltage)) * voltageLSB / 1000.0
+		voltage := float64(rawVoltage) * voltageLSB / 1000.0
 
 		// Read Power (Register 0x03)
 		rawPower, err := readINA260Reg(ina260, ina260RegPower)
