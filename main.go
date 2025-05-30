@@ -1,20 +1,3 @@
-/*
-
- To provide metrics for Prometheus, we'll use the `github.com/prometheus/client_golang/prometheus` and `github.com/prometheus/client_golang/prometheus/promhttp` libraries. These libraries allow us to define metrics (like gauges for current, voltage, and power) and expose them via an HTTP endpoint that Prometheus can scrape.
-
-Here's how to integrate Prometheus metrics into your existing Go application:
-
-1.  **Import necessary packages:**
-    *   `net/http` for the HTTP server.
-    *   `github.com/prometheus/client_golang/prometheus` for defining metrics.
-    *   `github.com/prometheus/client_golang/prometheus/promhttp` for the HTTP handler that exposes metrics.
-
-2.  **Define global Prometheus Gauges:** Gauges are suitable for values that can go up and down, such as current, voltage, and power. We'll create three `Gauge` metrics: `ina260_current_amperes`, `ina260_voltage_volts`, and `ina260_power_watts`. We'll use `promauto.NewGauge` which automatically registers the metric with the default Prometheus registry.
-
-3.  **Update metrics in the reading loop:** Inside the infinite loop where the `INA260` sensor data is read, after successfully reading the current, voltage, and power, we'll update the corresponding Prometheus gauges using the `Set()` method.
-
-4.  **Start an HTTP server:** In a separate goroutine, an HTTP server will be started to listen for requests on a specific port (e.g., 9090). The `/metrics` endpoint will be handled by `promhttp.Handler()`, which exposes all registered Prometheus metrics.
-*/
 package main
 import (
 	"encoding/binary" // For binary.BigEndian
