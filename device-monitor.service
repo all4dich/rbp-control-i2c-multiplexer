@@ -1,0 +1,14 @@
+[Unit]
+Description=device-monitor
+After=network.target multi-user.target
+
+[Service]
+ExecStart=/path/to/your/directory/start.sh
+Type=simple
+# Optional: User=your_username (uncomment and replace if you want the script to run as a specific user instead of root)
+# Optional: WorkingDirectory=/path/to/your/directory/ (uncomment and replace if your script needs a specific working directory)
+# Optional: Restart=on-failure (uncomment to restart the service if it exits with an error)
+# Optional: RestartSec=5 (uncomment to wait 5 seconds before restarting, if Restart is enabled)
+
+[Install]
+WantedBy=multi-user.target
