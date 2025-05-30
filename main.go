@@ -63,11 +63,18 @@ func main() {
 
 	// --- Get TCA's address as argument and assign it to tcaAddress ---
 	// Get the TCA address and channel number as arguments
+	var tcaAddressStr string
+	var channelStr string
+
 	if len(os.Args) < 3 {
-		log.Fatalf("Usage: %s <tca_address_hex> <channel_number>", os.Args[0])
+		fmt.Println("No arguments or less than 2 arguments provided. Using default TCA address 0x70 and channel 0.")
+		tcaAddressStr = "0x70"
+		channelStr = "0"
+	} else {
+		tcaAddressStr = os.Args[1]
+		channelStr = os.Args[2] // Now channel number is the second argument
 	}
 
-	tcaAddressStr := os.Args[1]
 	tcaAddress64, err := strconv.ParseUint(tcaAddressStr, 0, 16) // 0 for auto-detection of base (0x prefix means hex)
 	if err != nil {
 		log.Fatalf("Invalid TCA address: %v", err)
@@ -79,7 +86,6 @@ func main() {
 
 	// --- Select the channel the INA260 is on ---
 	// Get the channel number as argument and assign it to ina260Channel variable
-	channelStr := os.Args[2] // Now channel number is the second argument
 	channelInt, err := strconv.Atoi(channelStr)
 	if err != nil {
 		log.Fatalf("Invalid channel number: %v", err)
