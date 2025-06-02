@@ -86,53 +86,21 @@ func main() {
 		log.Fatalf("Failed to get hostname: %v", err)
 	}
 
-	// --- Get TCA's address as argument and assign it to tcaAddress ---
-	// Get the TCA address and channel number as arguments
-	var tcaAddressStr string
-	var channelStr string
-
-	if len(os.Args) < 3 {
-		fmt.Println("No arguments or less than 2 arguments provided. Using default TCA address 0x70 and channel 0.")
-		tcaAddressStr = "0x70"
-		channelStr = "0"
+	// --- Get INA260 I2C address as argument ---
+	var ina260AddressStr string
+	if len(os.Args) < 2 {
+		fmt.Println("No INA260 I2C address argument provided. Using default address 0x40.")
+		ina260AddressStr = "0x40"
 	} else {
-		tcaAddressStr = os.Args[1]
-		channelStr = os.Args[2] // Now channel number is the second argument
+		ina260AddressStr = os.Args[1]
 	}
 
-	tcaAddress64, err := strconv.ParseUint(tcaAddressStr, 0, 16) // 0 for auto-detection of base (0x prefix means hex)
+	ina260Address64, err := strconv.ParseUint(ina260AddressStr, 0, 16) // 0 for auto-detection of base (0x prefix means hex)
 	if err != nil {
-		log.Fatalf("Invalid TCA address: %v", err)
+		log.Fatalf("Invalid INA260 I2C address: %v", err)
 	}
-	tcaAddress := uint16(tcaAddress64)
-
-	tca := &i2c.Dev{Bus: bus, Addr: tcaAddress}
-	fmt.Printf("Using TCA9548A at address: 0x%X\n", tcaAddress) // Confirm the address being used
-
-	// --- Select the channel the INA260 is on ---
-	// Get the channel number as argument and assign it to ina260Channel variable
-	channelInt, err := strconv.Atoi(channelStr)
-	if err != nil {
-		log.Fatalf("Invalid channel number: %v", err)
-	}
-	if channelInt < 0 || channelInt > 7 { // TCA9548A typically has 8 channels (0-7)
-		log.Fatalf("Channel number must be between 0 and 7, got %d", channelInt)
-	}
-	ina260Channel := byte(channelInt)
-
-	channelSelectionByte := byte(1 << ina260Channel)
-
-	if err := tca.Tx([]byte{channelSelectionByte}, nil); err != nil {
-		log.Fatalf("Failed to select channel %d on TCA9548A: %v", ina260Channel, err)
-	}
-	fmt.Printf("TCA9548A: Selected channel %d\n", ina260Channel)
-
-	// Now, communications on 'bus' will be routed to devices on the selected channel.
-	// Proceed to communicate with the INA260.
-	ina260 := &i2c.Dev{Bus: bus, Addr: ina260Address}
-
-	// -------------------- Set Device Label --------------------
-	deviceLabel := fmt.Sprintf("tca9548a_0x%X_ch%d_ina260", tcaAddress, ina260Channel)
+	ina260 := &i2c.Dev{Bus: bus, Addr: uint16(ina260Address64)}
+	deviceLabel := fmt.Sprintf("ina260_0x%X", uint16(ina260Address64))
 
 	// Optional: Read Manufacturer ID and Device ID to verify communication with INA260
 	// Expected Manufacturer ID: 0x5449 (TI), Device ID: 0x2260 (INA260)
