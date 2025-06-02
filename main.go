@@ -116,7 +116,7 @@ func getDevice(bus i2c.BusCloser, tcaAddressStr string, channelStr string) (*i2c
 
 func main() {
 	// set flagged arguments for TCA9548A address and channel
-	tcaAddressFlag := flag.String("tca_address", "0x70", "I2C address of the TCA9548A multiplexer (default: 0x70)") // Initialize host and I2C bus
+	tcaAddressFlag := flag.String("tca-address", "0x70", "I2C address of the TCA9548A multiplexer (default: 0x70)") // Initialize host and I2C bus
 	channelFlag := flag.Int("channel", 0, "Channel number on the TCA9548A multiplexer (0-7, default: 0)")
 
 	flag.Parse()
