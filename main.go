@@ -69,21 +69,26 @@ func readINA260Reg(dev *i2c.Dev, reg byte) (uint16, error) {
 	return binary.BigEndian.Uint16(readBuf), nil
 }
 
+func initializeI2C() (i2c.BusCloser, error) {
+	if _, err := host.Init(); err != nil {
+		return nil, fmt.Errorf("failed to initialize host: %w", err)
+	}
+	bus, err := i2creg.Open("") // Opens the default I2C bus
+	if err != nil {
+		return nil, fmt.Errorf("failed to open I2C bus: %w", err)
+	}
+	return bus, nil
+}
+
 func main() {
 	// set flagged arguments for TCA9548A address and channel
 	tcaAddressFlag := flag.String("tca_address", "0x70", "I2C address of the TCA9548A multiplexer (default: 0x70)") // Initialize host and I2C bus
 	channelFlag := flag.Int("channel", 0, "Channel number on the TCA9548A multiplexer (0-7, default: 0)")
 
 	flag.Parse()
-	if _, err := host.Init(); err != nil {
-		log.Fatal(err)
-	}
 
-	bus, err := i2creg.Open("") // Opens the default I2C bus (e.g., /dev/i2c-1 on a Raspberry Pi)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer bus.Close()
+	bus, err := initializeI2C() // Initialize I2C bus
+	defer bus.Close()           // Ensure the bus is closed when done
 
 	// -------------------- Set Hostname Label --------------------
 	hostname, err := os.Hostname()
