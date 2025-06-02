@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary" // For binary.BigEndian
+	"flag"
 	"fmt"
 	"log"
 	"net/http" // New import for HTTP server
@@ -68,38 +69,18 @@ func readINA260Reg(dev *i2c.Dev, reg byte) (uint16, error) {
 	return binary.BigEndian.Uint16(readBuf), nil
 }
 
-func main() {
-	// Initialize host and I2C bus
+func initializeI2C() (i2c.BusCloser, error) {
 	if _, err := host.Init(); err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to initialize host: %w", err)
 	}
-
-	bus, err := i2creg.Open("") // Opens the default I2C bus (e.g., /dev/i2c-1 on a Raspberry Pi)
+	bus, err := i2creg.Open("") // Opens the default I2C bus
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to open I2C bus: %w", err)
 	}
-	defer bus.Close()
+	return bus, nil
+}
 
-	// -------------------- Set Hostname Label --------------------
-	hostname, err := os.Hostname()
-	if err != nil {
-		log.Fatalf("Failed to get hostname: %v", err)
-	}
-
-	// --- Get TCA's address as argument and assign it to tcaAddress ---
-	// Get the TCA address and channel number as arguments
-	var tcaAddressStr string
-	var channelStr string
-
-	if len(os.Args) < 3 {
-		fmt.Println("No arguments or less than 2 arguments provided. Using default TCA address 0x70 and channel 0.")
-		tcaAddressStr = "0x70"
-		channelStr = "0"
-	} else {
-		tcaAddressStr = os.Args[1]
-		channelStr = os.Args[2] // Now channel number is the second argument
-	}
-
+func getDevice(bus i2c.BusCloser, tcaAddressStr string, channelStr string) (*i2c.Dev, error) {
 	tcaAddress64, err := strconv.ParseUint(tcaAddressStr, 0, 16) // 0 for auto-detection of base (0x prefix means hex)
 	if err != nil {
 		log.Fatalf("Invalid TCA address: %v", err)
@@ -109,30 +90,60 @@ func main() {
 	tca := &i2c.Dev{Bus: bus, Addr: tcaAddress}
 	fmt.Printf("Using TCA9548A at address: 0x%X\n", tcaAddress) // Confirm the address being used
 
-	// --- Select the channel the INA260 is on ---
 	// Get the channel number as argument and assign it to ina260Channel variable
 	channelInt, err := strconv.Atoi(channelStr)
 	if err != nil {
-		log.Fatalf("Invalid channel number: %v", err)
+		return nil, fmt.Errorf("invalid channel number: %w", err)
 	}
 	if channelInt < 0 || channelInt > 7 { // TCA9548A typically has 8 channels (0-7)
-		log.Fatalf("Channel number must be between 0 and 7, got %d", channelInt)
+		return nil, fmt.Errorf("channel number must be between 0 and 7, got %d", channelInt)
 	}
 	ina260Channel := byte(channelInt)
-
+	// Select the channel on the TCA9548A multiplexer
 	channelSelectionByte := byte(1 << ina260Channel)
-
 	if err := tca.Tx([]byte{channelSelectionByte}, nil); err != nil {
-		log.Fatalf("Failed to select channel %d on TCA9548A: %v", ina260Channel, err)
+		return nil, fmt.Errorf("failed to select channel %d on TCA9548A: %w", ina260Channel, err)
 	}
 	fmt.Printf("TCA9548A: Selected channel %d\n", ina260Channel)
 
-	// Now, communications on 'bus' will be routed to devices on the selected channel.
-	// Proceed to communicate with the INA260.
-	ina260 := &i2c.Dev{Bus: bus, Addr: ina260Address}
+	dev := &i2c.Dev{Bus: bus, Addr: ina260Address}
+	// Optionally, you can perform a quick check to see if the device responds
+	if err := dev.Tx([]byte{0}, nil); err != nil {
+		return nil, fmt.Errorf("failed to communicate with device at address 0x%X: %w", ina260Address, err)
+	}
+	return dev, nil
+}
+
+func main() {
+	// set flagged arguments for TCA9548A address and channel
+	tcaAddressFlag := flag.String("tca-address", "0x70", "I2C address of the TCA9548A multiplexer (default: 0x70)") // Initialize host and I2C bus
+	channelFlag := flag.Int("channel", 0, "Channel number on the TCA9548A multiplexer (0-7, default: 0)")
+
+	flag.Parse()
+	bus, err := initializeI2C() // Initialize I2C bus
+	if err != nil {
+		log.Fatalf("Failed to initialize I2C: %v", err)
+	}
+	defer bus.Close() // Ensure the bus is closed when done
+
+	// -------------------- Set Hostname Label --------------------
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Fatalf("Failed to get hostname: %v", err)
+	}
+
+	// --- Get TCA's address as argument and assign it to tcaAddress ---
+	// Get the TCA address and channel number as arguments
+	// Get the TCA address and channel number from flags
+	tcaAddressStr := *tcaAddressFlag
+	channelStr := strconv.Itoa(*channelFlag)
+
+	fmt.Printf("Using TCA address: %s, Channel: %s\n", tcaAddressStr, channelStr)
+
+	ina260, err := getDevice(bus, tcaAddressStr, channelStr)
 
 	// -------------------- Set Device Label --------------------
-	deviceLabel := fmt.Sprintf("tca9548a_0x%X_ch%d_ina260", tcaAddress, ina260Channel)
+	deviceLabel := fmt.Sprintf("tca9548a_%s_ch%s_ina260", tcaAddressStr, channelStr)
 
 	// Optional: Read Manufacturer ID and Device ID to verify communication with INA260
 	// Expected Manufacturer ID: 0x5449 (TI), Device ID: 0x2260 (INA260)
