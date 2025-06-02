@@ -81,31 +81,32 @@ func initializeI2C() (i2c.BusCloser, error) {
 }
 
 func getDevice(bus i2c.BusCloser, tcaAddressStr string, channelStr string) (*i2c.Dev, error) {
-	tcaAddress64, err := strconv.ParseUint(tcaAddressStr, 0, 16) // 0 for auto-detection of base (0x prefix means hex)
-	if err != nil {
-		log.Fatalf("Invalid TCA address: %v", err)
-	}
-	tcaAddress := uint16(tcaAddress64)
+	if tcaAddressStr != "" && channelStr != "" {
+		tcaAddress64, err := strconv.ParseUint(tcaAddressStr, 0, 16) // 0 for auto-detection of base (0x prefix means hex)
+		if err != nil {
+			log.Fatalf("Invalid TCA address: %v", err)
+		}
+		tcaAddress := uint16(tcaAddress64)
 
-	tca := &i2c.Dev{Bus: bus, Addr: tcaAddress}
-	fmt.Printf("Using TCA9548A at address: 0x%X\n", tcaAddress) // Confirm the address being used
+		tca := &i2c.Dev{Bus: bus, Addr: tcaAddress}
+		fmt.Printf("Using TCA9548A at address: 0x%X\n", tcaAddress) // Confirm the address being used
 
-	// Get the channel number as argument and assign it to ina260Channel variable
-	channelInt, err := strconv.Atoi(channelStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid channel number: %w", err)
+		// Get the channel number as argument and assign it to ina260Channel variable
+		channelInt, err := strconv.Atoi(channelStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid channel number: %w", err)
+		}
+		if channelInt < 0 || channelInt > 7 { // TCA9548A typically has 8 channels (0-7)
+			return nil, fmt.Errorf("channel number must be between 0 and 7, got %d", channelInt)
+		}
+		ina260Channel := byte(channelInt)
+		// Select the channel on the TCA9548A multiplexer
+		channelSelectionByte := byte(1 << ina260Channel)
+		if err := tca.Tx([]byte{channelSelectionByte}, nil); err != nil {
+			return nil, fmt.Errorf("failed to select channel %d on TCA9548A: %w", ina260Channel, err)
+		}
+		fmt.Printf("TCA9548A: Selected channel %d\n", ina260Channel)
 	}
-	if channelInt < 0 || channelInt > 7 { // TCA9548A typically has 8 channels (0-7)
-		return nil, fmt.Errorf("channel number must be between 0 and 7, got %d", channelInt)
-	}
-	ina260Channel := byte(channelInt)
-	// Select the channel on the TCA9548A multiplexer
-	channelSelectionByte := byte(1 << ina260Channel)
-	if err := tca.Tx([]byte{channelSelectionByte}, nil); err != nil {
-		return nil, fmt.Errorf("failed to select channel %d on TCA9548A: %w", ina260Channel, err)
-	}
-	fmt.Printf("TCA9548A: Selected channel %d\n", ina260Channel)
-
 	dev := &i2c.Dev{Bus: bus, Addr: ina260Address}
 	// Optionally, you can perform a quick check to see if the device responds
 	if err := dev.Tx([]byte{0}, nil); err != nil {
@@ -118,6 +119,7 @@ func main() {
 	// set flagged arguments for TCA9548A address and channel
 	tcaAddressFlag := flag.String("tca-address", "0x70", "I2C address of the TCA9548A multiplexer (default: 0x70)") // Initialize host and I2C bus
 	channelFlag := flag.Int("channel", 0, "Channel number on the TCA9548A multiplexer (0-7, default: 0)")
+	withoutMultiplexerFlag := flag.Bool("without-multiplexer", false, "Set to true if INA260 is connected directly without TCA9548A multiplexer (default: false)")
 
 	flag.Parse()
 	bus, err := initializeI2C() // Initialize I2C bus
@@ -135,12 +137,40 @@ func main() {
 	// --- Get TCA's address as argument and assign it to tcaAddress ---
 	// Get the TCA address and channel number as arguments
 	// Get the TCA address and channel number from flags
-	tcaAddressStr := *tcaAddressFlag
-	channelStr := strconv.Itoa(*channelFlag)
+	if *withoutMultiplexerFlag {
+		fmt.Println("Running without TCA9548A multiplexer, using INA260 directly.")
+		tcaAddressFlag = nil // Set to nil to skip TCA address usage
+		channelFlag = nil    // Set to nil to skip channel usage
+	} else {
+		fmt.Println("Running with TCA9548A multiplexer.")
+	}
 
-	fmt.Printf("Using TCA address: %s, Channel: %s\n", tcaAddressStr, channelStr)
+	var tcaAddressStr string = ""
+	var channelStr string = ""
+	if tcaAddressFlag == nil && channelFlag == nil {
+		fmt.Println("Running without TCA9548A multiplexer, using INA260 directly.")
+	} else {
+		// If TCA address and channel are provided, use them
+		// Check if TCA address is connected or not
+		tcaAddressStr = *tcaAddressFlag
+		channelStr = strconv.Itoa(*channelFlag)
+		fmt.Printf("Using TCA address: %s, Channel: %s\n", tcaAddressStr, channelStr)
+	}
 
 	ina260, err := getDevice(bus, tcaAddressStr, channelStr)
+	if err != nil {
+		if *withoutMultiplexerFlag {
+			log.Fatalf("Failed to get INA260 device directly: %v", err)
+		} else {
+			log.Printf("Failed to get INA260 through TCA9548A: %v. Retrying without multiplexer...", err)
+			if ina260, err = getDevice(bus, "", ""); err != nil {
+				log.Fatalf("Failed to get INA260 device directly: %v", err)
+			}
+			fmt.Println("Successfully connected to INA260 directly.")
+		}
+	} else {
+		fmt.Println("Successfully connected to INA260")
+	}
 
 	// -------------------- Set Device Label --------------------
 	deviceLabel := fmt.Sprintf("tca9548a_%s_ch%s_ina260", tcaAddressStr, channelStr)
