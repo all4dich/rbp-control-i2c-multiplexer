@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary" // For binary.BigEndian
+	"flag"
 	"fmt"
 	"log"
 	"net/http" // New import for HTTP server
@@ -69,7 +70,11 @@ func readINA260Reg(dev *i2c.Dev, reg byte) (uint16, error) {
 }
 
 func main() {
-	// Initialize host and I2C bus
+	// set flagged arguments for TCA9548A address and channel
+	tcaAddressFlag := flag.String("tca_address", "0x70", "I2C address of the TCA9548A multiplexer (default: 0x70)") // Initialize host and I2C bus
+	channelFlag := flag.Int("channel", 0, "Channel number on the TCA9548A multiplexer (0-7, default: 0)")
+
+	flag.Parse()
 	if _, err := host.Init(); err != nil {
 		log.Fatal(err)
 	}
@@ -88,17 +93,11 @@ func main() {
 
 	// --- Get TCA's address as argument and assign it to tcaAddress ---
 	// Get the TCA address and channel number as arguments
-	var tcaAddressStr string
-	var channelStr string
+	// Get the TCA address and channel number from flags
+	tcaAddressStr := *tcaAddressFlag
+	channelStr := strconv.Itoa(*channelFlag)
 
-	if len(os.Args) < 3 {
-		fmt.Println("No arguments or less than 2 arguments provided. Using default TCA address 0x70 and channel 0.")
-		tcaAddressStr = "0x70"
-		channelStr = "0"
-	} else {
-		tcaAddressStr = os.Args[1]
-		channelStr = os.Args[2] // Now channel number is the second argument
-	}
+	fmt.Printf("Using TCA address: %s, Channel: %s\n", tcaAddressStr, channelStr)
 
 	tcaAddress64, err := strconv.ParseUint(tcaAddressStr, 0, 16) // 0 for auto-detection of base (0x prefix means hex)
 	if err != nil {
