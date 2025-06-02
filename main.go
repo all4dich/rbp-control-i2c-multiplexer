@@ -150,12 +150,30 @@ func main() {
 	if tcaAddressFlag == nil && channelFlag == nil {
 		fmt.Println("Running without TCA9548A multiplexer, using INA260 directly.")
 	} else {
+		// If TCA address and channel are provided, use them
+		// Check if TCA address is connected or not
 		tcaAddressStr = *tcaAddressFlag
 		channelStr = strconv.Itoa(*channelFlag)
 		fmt.Printf("Using TCA address: %s, Channel: %s\n", tcaAddressStr, channelStr)
 	}
 
 	ina260, err := getDevice(bus, tcaAddressStr, channelStr)
+	if err != nil {
+		if *withoutMultiplexerFlag {
+			log.Fatalf("Failed to get INA260 device directly: %v", err)
+		} else {
+			fmt.Printf("Failed to get INA260 device through TCA9548A: %v", err)
+			fmt.Printf("Trying to get INA260 directly without TCA9548A...\n")
+			ina260, err = getDevice(bus, "", "") // Try to get INA260 directly without TCA9548A
+			if err != nil {
+				log.Fatalf("Failed to get INA260 device directly: %v", err)
+			} else {
+				fmt.Println("Successfully connected to INA260 directly.")
+			}
+		}
+	} else {
+		fmt.Println("Successfully connected to INA260")
+	}
 
 	// -------------------- Set Device Label --------------------
 	deviceLabel := fmt.Sprintf("tca9548a_%s_ch%s_ina260", tcaAddressStr, channelStr)
