@@ -121,7 +121,10 @@ func main() {
 
 	flag.Parse()
 	bus, err := initializeI2C() // Initialize I2C bus
-	defer bus.Close()           // Ensure the bus is closed when done
+	if err != nil {
+		log.Fatalf("Failed to initialize I2C: %v", err)
+	}
+	defer bus.Close() // Ensure the bus is closed when done
 
 	// -------------------- Set Hostname Label --------------------
 	hostname, err := os.Hostname()
