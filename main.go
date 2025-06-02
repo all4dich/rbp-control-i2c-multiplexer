@@ -82,10 +82,10 @@ func initializeI2C() (i2c.BusCloser, error) {
 
 func getDevice(bus i2c.BusCloser, tcaAddressStr string, channelStr string) (*i2c.Dev, error) {
 	tcaAddress64, err := strconv.ParseUint(tcaAddressStr, 0, 16) // 0 for auto-detection of base (0x prefix means hex)
-	tcaAddress := uint16(tcaAddress64)
 	if err != nil {
 		log.Fatalf("Invalid TCA address: %v", err)
 	}
+	tcaAddress := uint16(tcaAddress64)
 
 	tca := &i2c.Dev{Bus: bus, Addr: tcaAddress}
 	fmt.Printf("Using TCA9548A at address: 0x%X\n", tcaAddress) // Confirm the address being used
