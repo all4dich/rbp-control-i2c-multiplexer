@@ -162,14 +162,11 @@ func main() {
 		if *withoutMultiplexerFlag {
 			log.Fatalf("Failed to get INA260 device directly: %v", err)
 		} else {
-			fmt.Printf("Failed to get INA260 device through TCA9548A: %v", err)
-			fmt.Printf("Trying to get INA260 directly without TCA9548A...\n")
-			ina260, err = getDevice(bus, "", "") // Try to get INA260 directly without TCA9548A
-			if err != nil {
+			log.Printf("Failed to get INA260 through TCA9548A: %v. Retrying without multiplexer...", err)
+			if ina260, err = getDevice(bus, "", ""); err != nil {
 				log.Fatalf("Failed to get INA260 device directly: %v", err)
-			} else {
-				fmt.Println("Successfully connected to INA260 directly.")
 			}
+			fmt.Println("Successfully connected to INA260 directly.")
 		}
 	} else {
 		fmt.Println("Successfully connected to INA260")
