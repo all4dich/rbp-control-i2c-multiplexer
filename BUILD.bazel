@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_binary") # Though not used in this step, it's good to load it.
+
+go_library(
+    name = "rbp-control_lib",
+    srcs = ["main.go"],
+    importpath = "all4dich/rbp-control-i2c-multiplexer",
+    visibility = ["//visibility:public"],
+    deps = [], # Will be populated by Gazelle later if possible, or manually if needed
+)
+
+go_binary(
+    name = "rbp-control-linux-amd64",
+    embed = [":rbp-control_lib"],
+    goos = "linux",
+    goarch = "amd64",
+    visibility = ["//visibility:public"],
+)
+
+go_binary(
+    name = "rbp-control-linux-arm64",
+    embed = [":rbp-control_lib"],
+    goos = "linux",
+    goarch = "arm64",
+    visibility = ["//visibility:public"],
+)
