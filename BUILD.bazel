@@ -1,5 +1,5 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
-load("@io_bazel_rules_go//go:def.bzl", "go_binary") # Though not used in this step, it's good to load it.
+load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_binary") # Though not used in this step, it's good to load it.
 
 go_library(
     name = "rbp-control_lib",

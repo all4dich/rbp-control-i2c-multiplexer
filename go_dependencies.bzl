@@ -182,6 +182,12 @@ def go_dependencies():
         version = "v3.7.2",
     )
     go_repository(
+         name = "io_periph_x_conn_v3_i2c_i2creg",
+         importpath = "periph.io/x/conn/v3/i2c/i2creg",
+         sum = "h1:qt9dE6XGP5ljbFnCKRJ9OOCoiOyBGlw7JZgoi72zZ1s=",
+         version = "v3.7.2",
+    )
+    go_repository(
         name = "io_periph_x_d2xx",
         importpath = "periph.io/x/d2xx",
         sum = "h1:LHp+u+qAWLB5THrTT/AzyjdvfUhllvDF5wBJP7uvn+U=",
