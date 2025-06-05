@@ -20,8 +20,12 @@ http_archive(
     ],
 )
 
-load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
+load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
+load("//:go_dependencies.bzl", "go_dependencies")
+
+# gazelle:repository_macro go_dependencies.bzl%go_dependencies
+go_dependencies()
 
 go_rules_dependencies()
 
