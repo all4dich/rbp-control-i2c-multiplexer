@@ -1,0 +1,25 @@
+ninja_required_version = 1.7
+
+go = go
+src = main.go
+bin = rbp-control
+
+rule go_get
+  command = ${go} get -v
+
+rule go_build
+  command = GOOS=${go_os} GOARCH=${go_arch} ${go} build -o ${bin}-${go_os}-${go_arch} ${src}
+
+build get: go_get
+
+build linux_arm64: go_build
+  go_os = linux
+  go_arch = arm64
+  depends = get
+
+build linux_amd64: go_build
+  go_os = linux
+  go_arch = amd64
+  depends = get
+
+build all: phony linux_arm64 linux_amd64
