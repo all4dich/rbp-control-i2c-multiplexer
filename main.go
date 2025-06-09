@@ -69,11 +69,11 @@ func readINA260Reg(dev *i2c.Dev, reg byte) (uint16, error) {
 	return binary.BigEndian.Uint16(readBuf), nil
 }
 
-func initializeI2C() (i2c.BusCloser, error) {
+func initializeI2C(busFlag string) (i2c.BusCloser, error) {
 	if _, err := host.Init(); err != nil {
 		return nil, fmt.Errorf("failed to initialize host: %w", err)
 	}
-	bus, err := i2creg.Open("") // Opens the default I2C bus
+	bus, err := i2creg.Open(busFlag) // Opens the default I2C bus
 	if err != nil {
 		return nil, fmt.Errorf("failed to open I2C bus: %w", err)
 	}
@@ -120,9 +120,10 @@ func main() {
 	tcaAddressFlag := flag.String("tca-address", "0x70", "I2C address of the TCA9548A multiplexer (default: 0x70)") // Initialize host and I2C bus
 	channelFlag := flag.Int("channel", 0, "Channel number on the TCA9548A multiplexer (0-7, default: 0)")
 	withoutMultiplexerFlag := flag.Bool("without-multiplexer", false, "Set to true if INA260 is connected directly without TCA9548A multiplexer (default: false)")
+	busFlag := flag.String("bus", "/dev/i2c-1", "I2C bus to use (default: /dev/i2c-1)")
 
 	flag.Parse()
-	bus, err := initializeI2C() // Initialize I2C bus
+	bus, err := initializeI2C(*busFlag) // Initialize I2C bus
 	if err != nil {
 		log.Fatalf("Failed to initialize I2C: %v", err)
 	}
