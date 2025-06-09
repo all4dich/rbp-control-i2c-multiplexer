@@ -1,5 +1,5 @@
 load("@gazelle//:def.bzl", "gazelle")
-load("@rules_go//go:def.bzl", "go_binary", "go_library")
+load("@rules_go//go:def.bzl", "go_binary", "go_cross_binary", "go_library")
 
 gazelle(name = "gazelle")
 
@@ -22,4 +22,10 @@ go_binary(
     name = "rbp-control-i2c-multiplexer",
     embed = [":rbp-control-i2c-multiplexer_lib"],
     visibility = ["//visibility:public"],
+)
+
+go_cross_binary(
+    name = "rbp-control-i2c-multiplexer_linux_arm",
+    platform = "@rules_go//go/toolchain:linux_arm_cgo",
+    target = ":rbp-control-i2c-multiplexer",
 )
